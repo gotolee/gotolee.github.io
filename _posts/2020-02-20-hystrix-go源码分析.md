@@ -22,7 +22,7 @@ hystrix.Go("my_command", func() error {
 
 利用类图可以帮助我们很好的理解代码。下面是hystrix-go源码的部分代码类图。
 
-！[类图](images/hystrix-go/hystrix-go.png)
+![](/images/hystrix-go/hystrix-go.png)
 
 ### 源码分析
 
@@ -324,7 +324,7 @@ func GoC(ctx context.Context, name string, run runFuncC, fallback fallbackFuncC)
 
 ```
 
-![流程图](images/hystrix-go/command.png)
+![](/images/hystrix-go/command.png)
 
 7、监控
 
