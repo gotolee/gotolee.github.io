@@ -1,31 +1,17 @@
 titile: gotolee的博客
-SEOTitle: gotolee的博客 | gotolee
 email: zimu94@163.com
 keyword: "gotolee, gotolee的博客, gotolee Python blog"
 url: "http://gotolee.github.io"         
 baseurl: ""   
 github_repo: "https://github.com/gotolee/gotolee.github.io.git"
 
-# SNS settings | 社交网络设置
 github_username: gotolee
 
 permalink: pretty
 paginate: 10
-
-# 转换时排除某些文件夹或文件。被排除的文件或文件夹的路径是相对于网站源码目录的，源码目录以外不受影响。
-exclude: ["less","node_modules","Gruntfile.js","package.json","README.md"]
-anchorjs: true                     
-
 Regeneration: true 
-
-# Gems
-# from PR#40, to support local preview for Jekyll 3.0
 plugins: [jekyll-paginate]
 
-# Markdown settings
-# replace redcarpet to kramdown,
-# although redcarpet can auto highlight code, the lack of header-id make the catalog impossible, so I switch to kramdown
-# document: http://jekyllrb.com/docs/configuration/#kramdown
 markdown: kramdown
 highlighter: rouge
 kramdown:

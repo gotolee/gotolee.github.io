@@ -1,12 +1,17 @@
-在微服务中基础服务延迟高，服务间调用超时时间设置不合理等原因导致整体不可用，这称为雪崩效应。为了解决雪崩，需要设置合理的服务间超时时间，采用熔断、限流等措施，避免服务整体不可用。
+---
+layout: post
+title: hystrix-go源码分析
+date: 2020-02-19 19:43:30
+categories: go
+tags: hystrix
+---
 
-[hystrix-go](https://github.com/afex/hystrix-go)是个有熔断、限流功能的开源的库，这个库来源于java版的hystrix库。
+在微服务中基础服务延迟高，服务间调用超时时间设置不合理等原因导致服务整体不可用，这称为雪崩效应。为了解决雪崩，需要设置合理的服务间超时时间，采用熔断、限流等措施，避免服务整体不可用。
+[hystrix-go](https://github.com/afex/hystrix-go)是个有熔断、限流功能的开源的库，这个库来源于java版的hystrix库。  
 
-### 怎样使用
-
-hystrix-go的官方文档如何使用的简单介绍。 提供了如何执行自定义的方法、定义自定义的失败执行方法等，
-
-例如：
+### 怎样使用   
+hystrix-go的官方文档对如何使用作了简单介绍。 介绍了如何执行自定义的方法、定义自定义的失败执行方法等。
+定义失败处理示例代码：
 ```
 hystrix.Go("my_command", func() error {
 	// talk to other services
@@ -16,18 +21,15 @@ hystrix.Go("my_command", func() error {
 	return nil
 })
 ```
-完整的例子可以参考hystrix-go源码目录下loadtest服务。
+完整的例子可以参考hystrix-go源码目录下loadtest服务。  
 
-### 源码类图
-
+### 源码类图   
 利用类图可以帮助我们很好的理解代码。下面是hystrix-go源码的部分代码类图。
-
 ![](/images/hystrix-go/hystrix-go.png)
 
-### 源码分析
-
-1、配置
-hystrix-go 支持按Command进行个性化配置。在程序启动时，可以调用hystrix.ConfigureCommand()对每个Command对象进行配置。
+### 源码分析  
+1、配置  
+hystrix-go支持按Command进行个性化配置。在程序启动时，可以调用hystrix.ConfigureCommand()对每个Command对象进行配置。
 ```
 hystrix.ConfigureCommand("my_command", hystrix.CommandConfig{
 	Timeout:                1000,  
@@ -37,18 +39,18 @@ hystrix.ConfigureCommand("my_command", hystrix.CommandConfig{
 	ErrorPercentThreshold:  25,
 })
 ```  
-CommandConfig 字段的意义如下表：   
+CommandConfig字段的意义如下表： 
 
-| 字段| 含义| 默认值|  
-| ---- | --- | --- |    
-|  Timeout |执行的超时时间  |  1000毫秒|   
-| MaxConcurrentRequests | 最大并发量 | 10 |   
+| 字段| 含义| 默认值|   
+| ---- | --- | --- |      
+| Timeout |执行的超时时间 | 1000毫秒|   
+| MaxConcurrentRequests | 最大并发量 | 10 |    
 | SleepWindow | 熔断器打开，控制下次单次测试是否恢复 | 5000毫秒|    
-| RequestVolumeThreshold |  一个统计窗口的容量值，超过后判断是否开启熔断| 20|    
-| ErrorPercentThreshold | 请求错误百分比，请求超过RequestVolumeThreshold且错误量达到此值，则开启熔断。| 50|    
+| RequestVolumeThreshold | 一个统计窗口的容量值，超过后判断是否开启熔断| 20|    
+| ErrorPercentThreshold | 请求错误百分比，请求超过RequestVolumeThreshold且错误量达到此值，则开启熔断| 50|    
 
-2、统计收集器
-MetricCollector表示收集熔断器的所有统计信息, 比如调用次数、失败次数、被拒绝次数等，DefaultMetricCollector代表默认的统计收集器。
+2、统计收集器   
+MetricCollector表示收集熔断器的所有统计信息，比如调用次数、失败次数、被拒绝次数等，DefaultMetricCollector代表默认的统计收集器。
 ```
 type DefaultMetricCollector struct {
 	mutex *sync.RWMutex
@@ -70,7 +72,7 @@ type DefaultMetricCollector struct {
 	runDuration       *rolling.Timing
 }
 ```
-关键的rolling.Number保存每个变量的值，每个变量保存最近10s的值，统计间隔是1s。 rolling.Number成员Buckets是个map，key为最近10s内的时间戳，值为64位浮点数。这是怎么实现的呢 ？
+关键的rolling.Number保存每个变量的值，每个变量保存最近10s的值，统计间隔是1s。 rolling.Number成员Buckets是个map，key为最近10s内的时间戳，值为64位浮点数。这是怎么实现的呢？
 ```
 func (r *Number) getCurrentBucket() *numberBucket {
 	now := time.Now().Unix()
@@ -114,10 +116,10 @@ func (r *Number) removeOldBuckets() {
 ```
 removeOldBuckets方法主要是遍历Buckets判断key的时间戳是否小于最近10s，来删除数据。   
 
-3、状态上报
+3、状态上报   
 CircuitBreaker（熔断器)->metricExchange(metric交换器)->MetricCollector(metric收集器)
-每个Command执行后将状态码(错误码)转成事件码，调用熔断器的reportEvent方法，写入metric交换器的update管道中，metric交换器开启协程调用IncrementMetrics方法写入到统计收集器中。
 
+每个Command执行后将状态码(错误码)转成事件码，调用熔断器的reportEvent方法，写入metric交换器的update管道中，metric交换器开启协程调用IncrementMetrics方法写入到统计收集器中。
 ```
 func (m *metricExchange) IncrementMetrics(wg *sync.WaitGroup, collector metricCollector.MetricCollector, update *commandExecution, totalDuration time.Duration) {
 	// granular metrics
@@ -165,11 +167,11 @@ func (m *metricExchange) IncrementMetrics(wg *sync.WaitGroup, collector metricCo
 }
 
 ```
-collector 是统计收集器，事件码转换metric结果保存在统计收集器中。
+collector是统计收集器，最终事件码转换metric结果保存在统计收集器中。
 
-4、流量控制
+4、流量控制  
 hystrix-go实现了对流量控制，采用的是令牌算法，请求方法执行前，先请求令牌，拿到令牌后执行请求，请求执行完成后返还令牌，得不到令牌拒绝执行请求方法，如果设置了callback方法，接着执行callback方法。如果没设置callback方法，则不执行。
-每个CircuitBreaker熔断器都有个executorPool变量指向一个executorPool结构体。 executorPool结构表示流控器，其中的变量max 表示最大的令牌量，可以通过MaxConcurrentRequests配置。Tickets变量表示令牌管道，存放令牌。
+每个CircuitBreaker熔断器都有个executorPool变量指向一个executorPool结构体。executorPool结构表示流控器，其中的变量max表示最大的令牌量，可以通过MaxConcurrentRequests配置，Tickets变量表示令牌管道，存放令牌。
 ```
 type executorPool struct {
 	Name    string
@@ -191,10 +193,8 @@ func (p *executorPool) Return(ticket *struct{}) { //返还令牌
 	}
 	p.Tickets <- ticket
 }
-```
-
-5、流量状态上报
-
+```   
+5、流量状态上报   
 在executorPool结构体中还有个Metrics变量，看名字我们知道这个用来收集thread Pool统计信息的。 返还令牌时，调用executorPool的Return方法，向poolMetrics的Updates管道写入数据，开启协程消费poolMetrics的Updates管道的数据更新MaxActiveRequests和Executed值。
 ```
 func (m *poolMetrics) Monitor() {
@@ -207,11 +207,9 @@ func (m *poolMetrics) Monitor() {
 		m.Mutex.RUnlock()
 	}
 }
-```
-6、GoC整个执行过程
-
-GoC 是个非常重要的基础函数，Go、Do、Doc都会调用此函数，
-
+```    
+6、GoC整个执行过程   
+GoC是个非常重要的基础函数，Go、Do、Doc都会调用此函数。
 ```
 func GoC(ctx context.Context, name string, run runFuncC, fallback fallbackFuncC) chan error {
 	cmd := &command{
@@ -322,32 +320,25 @@ func GoC(ctx context.Context, name string, run runFuncC, fallback fallbackFuncC)
 	return cmd.errChan
 }
 
-```
-
+```   
 ![](/images/hystrix-go/command.png)
-
-7、监控
-
-监控服务的metrics的方式有两种：一种是拉取metrics，开启dashboard metris的方法是在main.go中，在一个特定的端口注册http handler事件并开启一个goroutine监听端口，接着在hystrix dashboard 上配置拉取metrics的路径。代码如下。
+7、监控     
+服务的metrics收集方式有两种：一种是监控程序主动来服务拉取metrics数据。使用hystrix-go的服务需要在main.go中，在一个特定的端口注册http handler事件并开启一个goroutine监听端口。
 ```
 hystrixStreamHandler := hystrix.NewStreamHandler()
 hystrixStreamHandler.Start()
 go http.ListenAndServe(net.JoinHostPort("", "81"), hystrixStreamHandler)
 
-```
-
-hystrix dashboard 采用docker版的。
+```  
+接着需要在hystrix dashboard上配置拉取metrics的路径。为了快速测试，hystrix dashboard采用docker镜像的方式来部署。
 ```
 docker run -d -p 8888:9002 --name hystrix-dashboard mlabouardy/hystrix-dashboard:latest
-```
+```  
+hystrix-go源码目录下有个loadtest服务，加上主动拉取监控metrics的代码来使用。
+![](/images/hystrix-go/1582273115.png)
+![](/images/hystrix-go/1582273210.png)
 
-hystrix-go源码目录下有个loadtest服务，加上监控metrics的代码。
-
-监控效果如下
-
-
-
-第二种方式是服务主动推送metrics到收集metircs的服务中。比如服务主动推送metrics信息到statsd中，代码如下。
+第二种方式是服务主动推送metrics到收集metircs的服务中。比如服务主动推送metrics信息到statsd中，使用hystrix-go的示例代码如下。
 ```
 c, err := plugins.InitializeStatsdCollector(&plugins.StatsdCollectorConfig{
 	StatsdAddr: "localhost:8125",
@@ -358,10 +349,6 @@ if err != nil {
 }
 
 metricCollector.Registry.Register(c.NewStatsdCollector)
-```
-statsd 是个收集metrics的守护程序。 metircs 数据保存在类似InfluxDB的程序中，通过Grafana等前端程序展示。 同样采用docker方式部署这样的一套程序的话，可以采用[samuelebistoletti/docker-statsd-influxdb-grafana](https://github.com/samuelebistoletti/docker-statsd-influxdb-grafana)。
-
-hystrix-go源码目录下有个loadtest服务，需要配置好正确的statsd服务的地址信息就可以测试啦。
-
-监控效果如下：
-
+```  
+statsd是个收集metrics的守护程序。它收集的metircs数据可以保存在类似InfluxDB的程序中，通过Grafana等前端程序拉取展示。这里采用docker镜像的方式[samuelebistoletti/docker-statsd-influxdb-grafana](https://github.com/samuelebistoletti/docker-statsd-influxdb-grafana)来快速部署整个程序。
+![](/images/hystrix-go/1582276570.png)
